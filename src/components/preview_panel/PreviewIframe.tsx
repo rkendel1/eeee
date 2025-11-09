@@ -35,7 +35,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useStreamChat } from "@/hooks/useStreamChat";
-import { selectedComponentPreviewAtom } from "@/atoms/previewAtoms";
+import {
+  selectedComponentPreviewAtom,
+  previewIframeRefAtom,
+} from "@/atoms/previewAtoms";
 import { ComponentSelection } from "@/ipc/ipc_types";
 import {
   Tooltip,
@@ -172,6 +175,7 @@ export const PreviewIframe = ({ loading }: { loading: boolean }) => {
   const [selectedComponentPreview, setSelectedComponentPreview] = useAtom(
     selectedComponentPreviewAtom,
   );
+  const setPreviewIframeRef = useSetAtom(previewIframeRefAtom);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [isPicking, setIsPicking] = useState(false);
 
@@ -189,9 +193,14 @@ export const PreviewIframe = ({ loading }: { loading: boolean }) => {
   //detect if the user is using Mac
   const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
 
+  // Update iframe ref atom
+  useEffect(() => {
+    setPreviewIframeRef(iframeRef.current);
+  }, [iframeRef.current, setPreviewIframeRef]);
+
   // Deactivate component selector when selection is cleared
   useEffect(() => {
-    if (!selectedComponentPreview) {
+    if (!selectedComponentPreview || selectedComponentPreview.length === 0) {
       if (iframeRef.current?.contentWindow) {
         iframeRef.current.contentWindow.postMessage(
           { type: "deactivate-dyad-component-selector" },
@@ -217,8 +226,29 @@ export const PreviewIframe = ({ loading }: { loading: boolean }) => {
 
       if (event.data?.type === "dyad-component-selected") {
         console.log("Component picked:", event.data);
-        setSelectedComponentPreview(parseComponentSelection(event.data));
-        setIsPicking(false);
+
+        // Parse all components from the selection
+        const components = event.data.components
+          ? event.data.components
+              .map((comp: any) =>
+                parseComponentSelection({
+                  type: "dyad-component-selected",
+                  id: comp.id,
+                  name: comp.name,
+                }),
+              )
+              .filter((c: ComponentSelection | null) => c !== null)
+          : [];
+
+        // Add to existing components, avoiding duplicates by id
+        setSelectedComponentPreview((prev) => {
+          const existingIds = new Set(prev.map((c) => c.id));
+          const newComponents = components.filter(
+            (c: ComponentSelection) => !existingIds.has(c.id),
+          );
+          return [...prev, ...newComponents];
+        });
+
         return;
       }
 
