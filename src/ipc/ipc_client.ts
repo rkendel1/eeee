@@ -1,4 +1,3 @@
-import type { IpcRenderer } from "electron";
 import {
   type ChatSummary,
   ChatSummariesSchema,
@@ -35,6 +34,7 @@ import type {
 } from "./ipc_types";
 import type { ProposalResult } from "@/lib/schemas";
 import { showError } from "@/lib/toast";
+import { getIPCRenderer } from "@/lib/ipc";
 
 export interface ChatStreamCallbacks {
   onUpdate: (messages: Message[]) => void;
@@ -72,11 +72,11 @@ interface DeleteCustomModelParams {
 
 export class IpcClient {
   private static instance: IpcClient;
-  private ipcRenderer: IpcRenderer;
+  private ipcRenderer: ReturnType<typeof getIPCRenderer>;
   private chatStreams: Map<number, ChatStreamCallbacks>;
   private appStreams: Map<number, AppStreamCallbacks>;
   private constructor() {
-    this.ipcRenderer = (window as any).electron.ipcRenderer as IpcRenderer;
+    this.ipcRenderer = getIPCRenderer();
     this.chatStreams = new Map();
     this.appStreams = new Map();
     // Set up listeners for stream events

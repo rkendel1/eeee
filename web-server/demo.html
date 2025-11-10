@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dyad Web - Demo</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      border-radius: 8px;
+      padding: 30px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #333;
+      margin-top: 0;
+    }
+    .status {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 4px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .status.ok {
+      background: #d4edda;
+      color: #155724;
+    }
+    .status.error {
+      background: #f8d7da;
+      color: #721c24;
+    }
+    button {
+      background: #007bff;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin: 5px;
+      font-size: 14px;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    .result {
+      margin-top: 15px;
+      padding: 15px;
+      background: #f8f9fa;
+      border-radius: 4px;
+      border-left: 4px solid #007bff;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+    .section {
+      margin: 30px 0;
+      padding-top: 20px;
+      border-top: 1px solid #ddd;
+    }
+    .section:first-child {
+      border-top: none;
+      padding-top: 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🌐 Dyad Web Version - Demo</h1>
+    <p>This demo shows the web infrastructure working with basic API endpoints.</p>
+    
+    <div class="section">
+      <h2>Server Status</h2>
+      <button onclick="checkHealth()">Check Health</button>
+      <div id="health-result"></div>
+    </div>
+
+    <div class="section">
+      <h2>Platform Detection</h2>
+      <button onclick="testPlatformDetection()">Test Platform Detection</button>
+      <div id="platform-result"></div>
+    </div>
+
+    <div class="section">
+      <h2>App Version</h2>
+      <button onclick="getAppVersion()">Get App Version</button>
+      <div id="version-result"></div>
+    </div>
+
+    <div class="section">
+      <h2>Settings Management</h2>
+      <button onclick="getSettings()">Get Settings</button>
+      <button onclick="setSettings()">Update Settings</button>
+      <div id="settings-result"></div>
+    </div>
+
+    <div class="section">
+      <h2>Apps List</h2>
+      <button onclick="listApps()">List Apps</button>
+      <div id="apps-result"></div>
+    </div>
+
+    <div class="section">
+      <h2>Unimplemented Handler Demo</h2>
+      <button onclick="testUnimplemented()">Call Unimplemented Handler</button>
+      <div id="unimplemented-result"></div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = 'http://localhost:3001/api';
+
+    async function apiCall(channel, args = []) {
+      try {
+        const response = await fetch(`${API_BASE}/invoke/${channel}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({ args })
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        return await response.json();
+      } catch (error) {
+        throw new Error(`API call failed: ${error.message}`);
+      }
+    }
+
+    function showResult(elementId, data, isError = false) {
+      const element = document.getElementById(elementId);
+      element.innerHTML = `<div class="result">${JSON.stringify(data, null, 2)}</div>`;
+    }
+
+    async function checkHealth() {
+      try {
+        const response = await fetch('http://localhost:3001/health', {
+          credentials: 'include'
+        });
+        const data = await response.json();
+        showResult('health-result', data);
+      } catch (error) {
+        showResult('health-result', { error: error.message }, true);
+      }
+    }
+
+    async function testPlatformDetection() {
+      try {
+        const platform = await apiCall('get-system-platform');
+        const isElectron = typeof window.electron !== 'undefined';
+        const result = {
+          platform,
+          detectedEnvironment: isElectron ? 'Electron' : 'Web Browser',
+          hasElectronAPI: isElectron
+        };
+        showResult('platform-result', result);
+      } catch (error) {
+        showResult('platform-result', { error: error.message }, true);
+      }
+    }
+
+    async function getAppVersion() {
+      try {
+        const result = await apiCall('get-app-version');
+        showResult('version-result', result);
+      } catch (error) {
+        showResult('version-result', { error: error.message }, true);
+      }
+    }
+
+    async function getSettings() {
+      try {
+        const result = await apiCall('get-user-settings');
+        showResult('settings-result', result);
+      } catch (error) {
+        showResult('settings-result', { error: error.message }, true);
+      }
+    }
+
+    async function setSettings() {
+      try {
+        const newSettings = {
+          telemetryConsent: 'accepted',
+          selectedModel: {
+            name: 'gpt-4',
+            provider: 'openai'
+          }
+        };
+        const result = await apiCall('set-user-settings', [newSettings]);
+        showResult('settings-result', {
+          message: 'Settings updated successfully',
+          newSettings: result
+        });
+      } catch (error) {
+        showResult('settings-result', { error: error.message }, true);
+      }
+    }
+
+    async function listApps() {
+      try {
+        const result = await apiCall('list-apps');
+        showResult('apps-result', result);
+      } catch (error) {
+        showResult('apps-result', { error: error.message }, true);
+      }
+    }
+
+    async function testUnimplemented() {
+      try {
+        const result = await apiCall('some-unimplemented-handler', [{ test: 'data' }]);
+        showResult('unimplemented-result', result);
+      } catch (error) {
+        showResult('unimplemented-result', { error: error.message }, true);
+      }
+    }
+
+    // Auto-check health on page load
+    window.addEventListener('load', () => {
+      checkHealth();
+      testPlatformDetection();
+    });
+  </script>
+</body>
+</html>
